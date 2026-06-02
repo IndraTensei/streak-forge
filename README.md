@@ -1,0 +1,194 @@
+# 🔥 StreakForge
+
+> Build unbreakable habits with beautiful terminal streak tracking.
+
+StreakForge is a CLI tool that helps you track daily habits, creative streaks, and personal challenges — all from your terminal. Visualize your progress with fire charts, milestone celebrations, GitHub-style calendars, and insightful stats.
+
+Whether you're writing every day, exercising, learning a language, or building a side project, StreakForge keeps you motivated with beautiful visuals and encouraging milestone messages.
+
+![Python](https://img.shields.io/badge/python-3.8%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Platform](https://img.shields.io/badge/platform-cross--platform-lightgrey)
+
+## ✨ Features
+
+- **🎯 Habit Tracking** — Create named habits with custom emojis and day targets
+- **🔥 Streak Visualization** — Fire emoji indicators that grow with your streak
+- **📅 Contribution Calendar** — GitHub-style calendar showing your activity over the last 52 weeks
+- **🏆 Milestone Celebrations** — Special messages at 1, 3, 7, 14, 21, 30, 50, 66, 100, and 365 days
+- **📊 Global Stats** — See your best streaks, total logs, and overall progress
+- **📤 Export & Import** — Export to JSON/CSV, import from JSON files
+- **🎨 Beautiful Terminal UI** — Rich tables, panels, and progress bars
+- **💾 Local Storage** — All data stored locally in `~/.streak-forge/habits.json`
+- **🔧 Fully CLI** — No dependencies on external services, works offline
+
+## 🚀 Installation
+
+### From Source
+
+```bash
+git clone https://github.com/IndraTensei/streak-forge.git
+cd streak-forge
+pip install -r requirements.txt
+pip install -e .
+```
+
+### Quick Run (No Install)
+
+```bash
+git clone https://github.com/IndraTensei/streak-forge.git
+cd streak-forge
+pip install rich
+python streak_forge.py start "My Habit"
+```
+
+### Requirements
+
+- Python 3.8+
+- [rich](https://github.com/Textualize/rich) library
+
+## 📖 Usage
+
+### Create a New Habit
+
+```bash
+streak-forge start "Morning Run"
+streak-forge start "Write 500 Words" --target 66 --emoji ✍️
+streak-forge start "Meditate" --target 30 --emoji 🧘
+```
+
+### Log Your Progress
+
+```bash
+# Log today
+streak-forge log "Morning Run"
+
+# Log a specific date
+streak-forge log "Morning Run" --date 2026-06-01
+```
+
+### View Your Habits
+
+```bash
+# List all habits with streaks
+streak-forge list
+
+# Detailed view of one habit
+streak-forge show "Morning Run"
+
+# GitHub-style calendar
+streak-forge calendar "Morning Run"
+```
+
+### Check Stats
+
+```bash
+# Global statistics across all habits
+streak-forge stats
+```
+
+### Manage Habits
+
+```bash
+# Rename a habit
+streak-forge rename "Morning Run" "Daily Run"
+
+# Delete a habit (requires --force)
+streak-forge delete "Morning Run" --force
+```
+
+### Export & Import
+
+```bash
+# Export to JSON
+streak-forge export --format json > my-habits.json
+
+# Export to CSV
+streak-forge export --format csv > my-habits.csv
+
+# Import from JSON
+streak-forge import my-habits.json
+```
+
+## 🎮 Example Session
+
+```bash
+$ streak-forge start "Morning Run" --target 30 --emoji 🏃
+
+  ✨ New habit created!
+
+  🏃 Morning Run
+  Target: 30 days
+  Created: 2026-06-02
+
+  Log your first day with:
+    streak-forge log "Morning Run"
+
+$ streak-forge log "Morning Run"
+
+  🌱 Logged! 'Morning Run' for 2026-06-02
+  Current streak: 1 day
+
+  🎉 First step! Every journey begins with a single day!
+
+$ streak-forge list
+
+  🔥 StreakForge — Your Habits
+  ┌──────┬──────────────┬─────────┬─────────┬───────┬──────────────────────────────┬────────┐
+  │ 🏃   │ Morning Run  │    1    │    1    │   1   │ █░░░░░░░░░░░░░░░░░░░  3%    │  🌱    │
+  └──────┴──────────────┴─────────┴─────────┴───────┴──────────────────────────────┴────────┘
+
+$ streak-forge calendar "Morning Run"
+
+  📅 StreakForge Calendar — Morning Run
+  Last 52 weeks
+
+  Mon 🟢⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+  Wed ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+  Fri ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+
+  ⬛ No activity  🟢 Logged  ⬜ Future
+```
+
+## 🏗️ Project Structure
+
+```
+streak-forge/
+├── streak_forge.py      # Main CLI application
+├── setup.py             # Package setup
+├── requirements.txt     # Python dependencies
+├── README.md            # This file
+├── LICENSE              # MIT License
+└── .gitignore           # Git ignore rules
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Here's how to get started:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and add tests if applicable
+4. Commit: `git commit -m "Add amazing feature"`
+5. Push: `git push origin feature/amazing-feature`
+6. Open a Pull Request
+
+### Ideas for Contributions
+
+- [ ] Weekly/monthly summary reports
+- [ ] Habit categories and tags
+- [ ] Reminder notifications
+- [ ] Streak freeze/skip days (for planned rest days)
+- [ ] ASCII art streak visualizations
+- [ ] Integration with cron for daily reminders
+- [ ] Habit templates (common habits with preset targets)
+
+## 📝 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Rich](https://github.com/Textualize/rich) for beautiful terminal output
+- Inspired by GitHub's contribution graph and the power of showing up every day
+- Remember: *"You don't have to be extreme, just consistent."*
