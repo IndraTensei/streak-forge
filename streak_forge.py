@@ -21,6 +21,7 @@ Usage:
 """
 
 import argparse
+import calendar
 import json
 import os
 import sys
@@ -36,12 +37,78 @@ from rich import box
 
 console = Console()
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 # ── Data storage ──────────────────────────────────────────────────────────────
 
 DATA_DIR = Path.home() / ".streak-forge"
 DATA_FILE = DATA_DIR / "habits.json"
+FREEZE_FILE = DATA_DIR / "freezes.json"
+
+# ── Habit Templates ───────────────────────────────────────────────────────────
+
+HABIT_TEMPLATES = {
+    "water": {
+        "name": "Drink 8 Glasses of Water",
+        "emoji": "💧",
+        "target_days": 30,
+        "description": "Stay hydrated — drink 8 glasses of water daily",
+    },
+    "read": {
+        "name": "Read 30 Minutes",
+        "emoji": "📚",
+        "target_days": 30,
+        "description": "Read for at least 30 minutes every day",
+    },
+    "exercise": {
+        "name": "Exercise",
+        "emoji": "🏋️",
+        "target_days": 30,
+        "description": "Get at least 30 minutes of physical activity",
+    },
+    "meditate": {
+        "name": "Meditate",
+        "emoji": "🧘",
+        "target_days": 21,
+        "description": "Practice mindfulness meditation for 10+ minutes",
+    },
+    "journal": {
+        "name": "Journal",
+        "emoji": "📝",
+        "target_days": 30,
+        "description": "Write in your journal every day",
+    },
+    "code": {
+        "name": "Code Every Day",
+        "emoji": "💻",
+        "target_days": 100,
+        "description": "Write code daily — even just 15 minutes counts",
+    },
+    "walk": {
+        "name": "Take a Walk",
+        "emoji": "🚶",
+        "target_days": 30,
+        "description": "Go for a walk outside every day",
+    },
+    "sleep": {
+        "name": "Sleep 8 Hours",
+        "emoji": "😴",
+        "target_days": 30,
+        "description": "Get at least 8 hours of sleep each night",
+    },
+    "gratitude": {
+        "name": "Gratitude Practice",
+        "emoji": "🙏",
+        "target_days": 21,
+        "description": "Write down 3 things you're grateful for",
+    },
+    "stretch": {
+        "name": "Stretch",
+        "emoji": "🤸",
+        "target_days": 30,
+        "description": "Do 10+ minutes of stretching every day",
+    },
+}
 
 
 def ensure_data_dir():
@@ -61,6 +128,19 @@ def _save(data: dict):
         json.dump(data, f, indent=2, default=str)
 
 
+def _load_freezes() -> dict:
+    """Load freeze data: {habit_name: [date_strings]}."""
+    if not FREEZE_FILE.exists():
+        return {}
+    with open(FREEZE_FILE, "r") as f:
+        return json.load(f)
+
+
+def _save_freezes(freezes: dict):
+    with open(FREEZE_FILE, "w") as f:
+        json.dump(freezes, f, indent=2)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _today() -> str:
@@ -76,11 +156,15 @@ def _parse_date(s: str) -> str:
         sys.exit(1)
 
 
-def _streak_for_dates(dates: list[str]) -> int:
-    """Calculate current streak from a sorted list of date strings (most recent first)."""
-    if not dates:
+def _streak_for_dates(dates: list[str], freeze_dates: list[str] | None = None) -> int:
+    """Calculate current streak from a sorted list of date strings (most recent first).
+    
+    Freeze dates count as logged days so planned rest days don't break streaks.
+    """
+    if not dates and not freeze_dates:
         return 0
-    sorted_dates = sorted(set(dates), reverse=True)
+    all_dates = set(dates) | set(freeze_dates or [])
+    sorted_dates = sorted(all_dates, reverse=True)
     today = date.today()
     streak = 0
     check_date = today
@@ -222,7 +306,8 @@ def cmd_log(args):
     _save(data)
 
     dates = data["logs"][habit_name]
-    streak = _streak_for_dates(dates)
+    freezes = _load_freezes().get(habit_name, [])
+    streak = _streak_for_dates(dates, freezes)
     fire = _fire_emoji(streak)
 
     console.print()
@@ -265,10 +350,12 @@ def cmd_list(args):
     table.add_column("Status", width=6, justify="center")
 
     total_streaks = 0
+    all_freezes = _load_freezes()
     for h in habits:
         name = h["name"]
         dates = data["logs"].get(name, [])
-        streak = _streak_for_dates(dates)
+        freezes = all_freezes.get(name, [])
+        streak = _streak_for_dates(dates, freezes)
         longest = _longest_streak(dates)
         total = len(dates)
         target = h.get("target_days", 30)
@@ -311,7 +398,8 @@ def cmd_show(args):
         sys.exit(1)
 
     dates = sorted(data["logs"].get(habit_name, []))
-    streak = _streak_for_dates(dates)
+    freezes = _load_freezes().get(habit_name, [])
+    streak = _streak_for_dates(dates, freezes)
     longest = _longest_streak(dates)
     total = len(dates)
     target = habit.get("target_days", 30)
@@ -430,11 +518,13 @@ def cmd_stats(args):
     best_habit = ""
     best_longest = 0
     best_longest_habit = ""
+    all_freezes = _load_freezes()
 
     for h in habits:
         name = h["name"]
         dates = data["logs"].get(name, [])
-        streak = _streak_for_dates(dates)
+        freezes = all_freezes.get(name, [])
+        streak = _streak_for_dates(dates, freezes)
         longest = _longest_streak(dates)
         total_logs += len(dates)
         total_streak += streak
@@ -521,6 +611,302 @@ def cmd_delete(args):
     data["logs"].pop(habit_name, None)
     _save(data)
     console.print(f"  🗑️  Deleted '{habit_name}'")
+
+
+def cmd_freeze(args):
+    """Freeze a habit for a specific date (planned rest day that doesn't break streak)."""
+    data = _load()
+    name = args.name.strip()
+
+    habit_name = None
+    for h in data["habits"]:
+        if h["name"].lower() == name.lower():
+            habit_name = h["name"]
+            break
+
+    if habit_name is None:
+        console.print(f"[red]✗[/red] Habit '{name}' not found.")
+        sys.exit(1)
+
+    freeze_date = _parse_date(args.date) if args.date else _today()
+    freezes = _load_freezes()
+
+    if habit_name not in freezes:
+        freezes[habit_name] = []
+
+    if freeze_date in freezes[habit_name]:
+        console.print(f"[yellow]⚠[/yellow] '{habit_name}' is already frozen for {freeze_date}.")
+        return
+
+    # Check if already logged on this date
+    if freeze_date in data["logs"].get(habit_name, []):
+        console.print(f"[yellow]⚠[/yellow] '{habit_name}' is already logged for {freeze_date}.")
+        console.print(f"   A freeze is not needed — you've already completed it!")
+        return
+
+    freezes[habit_name].append(freeze_date)
+    freezes[habit_name].sort()
+    _save_freezes(freezes)
+
+    console.print()
+    console.print(Panel(
+        f"[bold blue]🥅 Day Frozen![/bold blue]\n\n"
+        f"  Habit: [bold]{habit_name}[/bold]\n"
+        f"  Date:  {freeze_date}\n\n"
+        f"  [dim]This day won't break your streak.[/dim]\n"
+        f'  [dim]Use [bold]streak-forge unfreeze "{habit_name}" {freeze_date}[/bold] to undo.[/dim]',
+        title="🔥 StreakForge",
+        border_style="blue",
+    ))
+
+
+def cmd_unfreeze(args):
+    """Remove a freeze for a habit on a specific date."""
+    name = args.name.strip()
+    freezes = _load_freezes()
+
+    habit_name = None
+    for h in _load()["habits"]:
+        if h["name"].lower() == name.lower():
+            habit_name = h["name"]
+            break
+
+    if habit_name is None:
+        console.print(f"[red]✗[/red] Habit '{name}' not found.")
+        sys.exit(1)
+
+    freeze_date = _parse_date(args.date) if args.date else _today()
+
+    if habit_name not in freezes or freeze_date not in freezes[habit_name]:
+        console.print(f"[yellow]⚠[/yellow] '{habit_name}' is not frozen for {freeze_date}.")
+        return
+
+    freezes[habit_name].remove(freeze_date)
+    if not freezes[habit_name]:
+        del freezes[habit_name]
+    _save_freezes(freezes)
+
+    console.print(f"  🧊 Unfroze '{habit_name}' for {freeze_date}.")
+
+
+def cmd_templates(args):
+    """List available habit templates or create a habit from a template."""
+    if args.action == "list":
+        table = Table(
+            title="🔥 StreakForge — Habit Templates",
+            box=box.ROUNDED,
+            show_lines=True,
+            title_style="bold magenta",
+        )
+        table.add_column("ID", style="bold cyan", width=12)
+        table.add_column("Emoji", justify="center", width=4)
+        table.add_column("Habit Name", min_width=22)
+        table.add_column("Target", justify="right", width=7)
+        table.add_column("Description", min_width=30)
+
+        for tid, tpl in sorted(HABIT_TEMPLATES.items()):
+            table.add_row(
+                tid,
+                tpl["emoji"],
+                tpl["name"],
+                f"{tpl['target_days']}d",
+                tpl["description"],
+            )
+
+        console.print(table)
+        console.print(f"\n  [dim]Use [bold]streak-forge template use <id>[/bold] to create a habit from a template.[/dim]")
+        console.print(f"  [dim]Use [bold]streak-forge template use <id> --emoji 🎯[/bold] to customize.[/dim]\n")
+
+    elif args.action == "use":
+        template_id = args.template_id.lower().strip()
+        if template_id not in HABIT_TEMPLATES:
+            console.print(f"[red]✗[/red] Unknown template: '{template_id}'.")
+            console.print(f"  Available templates: {', '.join(sorted(HABIT_TEMPLATES.keys()))}")
+            sys.exit(1)
+
+        tpl = HABIT_TEMPLATES[template_id]
+        data = _load()
+        name = tpl["name"]
+
+        # Check for duplicates
+        for h in data["habits"]:
+            if h["name"].lower() == name.lower():
+                console.print(f"[yellow]⚠[/yellow] Habit '{name}' already exists!")
+                sys.exit(1)
+
+        habit = {
+            "name": name,
+            "created_at": _today(),
+            "target_days": args.target if args.target else tpl["target_days"],
+            "emoji": args.emoji if args.emoji else tpl["emoji"],
+            "color": args.color or "white",
+            "template": template_id,
+        }
+        data["habits"].append(habit)
+        if name not in data["logs"]:
+            data["logs"][name] = []
+        _save(data)
+
+        console.print()
+        console.print(Panel(
+            f"[bold green]✨ Habit created from template![/bold green]\n\n"
+            f"  {habit['emoji']} [bold]{name}[/bold]\n"
+            f"  Target: {habit['target_days']} days\n"
+            f"  Created: {_today()}\n\n"
+            f"  [dim]{tpl['description']}[/dim]\n\n"
+            f'  [dim]Log your first day with:[/dim]\n'
+            f'  [bold]  streak-forge log "{name}"[/bold]',
+            title="🔥 StreakForge",
+            border_style="green",
+        ))
+
+
+def cmd_summary(args):
+    """Show weekly and monthly summary reports for all habits or a specific habit."""
+    data = _load()
+    habits = data["habits"]
+    today = date.today()
+    freezes = _load_freezes()
+
+    if not habits:
+        console.print("[dim]No habits to summarize.[/dim]")
+        return
+
+    # Filter to specific habit if requested
+    target_habits = habits
+    if args.habit:
+        target_habits = []
+        for h in habits:
+            if h["name"].lower() == args.habit.lower():
+                target_habits.append(h)
+                break
+        if not target_habits:
+            console.print(f"[red]✗[/red] Habit '{args.habit}' not found.")
+            sys.exit(1)
+
+    period = args.period  # weekly or monthly
+
+    for h in target_habits:
+        name = h["name"]
+        dates = set(data["logs"].get(name, []))
+        habit_freezes = set(freezes.get(name, []))
+
+        if period == "weekly":
+            # Show last 8 weeks
+            weeks_back = 8
+            console.print()
+            console.print(f"  📊 [bold]Weekly Summary — {name}[/bold]")
+            console.print(f"  [dim]Last {weeks_back} weeks (Mon–Sun)[/dim]\n")
+
+            table = Table(box=box.SIMPLE, show_lines=False, padding=(0, 1))
+            table.add_column("Week", style="bold", width=14)
+            table.add_column("Logs", justify="right", width=6)
+            table.add_column("Freezes", justify="right", width=8)
+            table.add_column("Completion", min_width=24)
+            table.add_column("Status", width=4, justify="center")
+
+            for w in range(weeks_back - 1, -1, -1):
+                week_start = today - timedelta(days=today.weekday() + 7 * w)
+                week_end = week_start + timedelta(days=6)
+                week_label = f"{week_start.strftime('%b %d')}–{week_end.strftime('%b %d')}"
+                if w == 0:
+                    week_label += " (this)"
+                elif w == 1:
+                    week_label += " (last)"
+
+                week_dates = set()
+                for i in range(7):
+                    d = (week_start + timedelta(days=i)).isoformat()
+                    week_dates.add(d)
+
+                logged = len(dates & week_dates)
+                frozen = len(habit_freezes & week_dates)
+                active = logged + frozen
+                pct = min(active / 7, 1.0)
+                bar_width = 16
+                filled = int(pct * bar_width)
+                bar = "█" * filled + "░" * (bar_width - filled)
+                status = "✅" if active >= 7 else "🔥" if active >= 4 else "🌱" if active > 0 else "💤"
+
+                table.add_row(
+                    week_label,
+                    str(logged),
+                    str(frozen),
+                    f"{bar} {active}/7",
+                    status,
+                )
+
+            console.print(table)
+
+        elif period == "monthly":
+            # Show last 6 months
+            months_back = 6
+            console.print()
+            console.print(f"  📊 [bold]Monthly Summary — {name}[/bold]")
+            console.print(f"  [dim]Last {months_back} months[/dim]\n")
+
+            table = Table(box=box.SIMPLE, show_lines=False, padding=(0, 1))
+            table.add_column("Month", style="bold", width=14)
+            table.add_column("Logs", justify="right", width=6)
+            table.add_column("Freezes", justify="right", width=8)
+            table.add_column("Completion", min_width=26)
+            table.add_column("Status", width=4, justify="center")
+
+            for m in range(months_back - 1, -1, -1):
+                # Calculate target month
+                month_num = today.month - m
+                year_num = today.year
+                while month_num <= 0:
+                    month_num += 12
+                    year_num -= 1
+
+                days_in_month = calendar.monthrange(year_num, month_num)[1]
+                month_start = date(year_num, month_num, 1)
+                month_end = date(year_num, month_num, days_in_month)
+                month_label = month_start.strftime("%b %Y")
+                if m == 0:
+                    month_label += " (cur)"
+                elif m == 1:
+                    month_label += " (last)"
+
+                month_dates = set()
+                for i in range(days_in_month):
+                    d = (month_start + timedelta(days=i)).isoformat()
+                    month_dates.add(d)
+
+                logged = len(dates & month_dates)
+                frozen = len(habit_freezes & month_dates)
+                active = logged + frozen
+                pct_min = min(active / days_in_month, 1.0)
+                bar_width = 16
+                filled = int(pct_min * bar_width)
+                bar = "█" * filled + "░" * (bar_width - filled)
+                status = "✅" if active >= days_in_month * 0.9 else "🔥" if active >= days_in_month * 0.5 else "🌱" if active > 0 else "💤"
+
+                table.add_row(
+                    month_label,
+                    str(logged),
+                    str(frozen),
+                    f"{bar} {active}/{days_in_month}",
+                    status,
+                )
+
+            console.print(table)
+
+        # Yearly overview streak (total active days this year)
+        year_start = date(today.year, 1, 1)
+        year_dates = set()
+        d = year_start
+        while d <= today:
+            year_dates.add(d.isoformat())
+            d += timedelta(days=1)
+        year_logged = len(dates & year_dates)
+        year_freezes = len(habit_freezes & year_dates)
+        total_days = (today - year_start).days + 1
+        year_pct = (year_logged + year_freezes) / total_days * 100 if total_days > 0 else 0
+        console.print(f"\n  📈 Year {today.year}: {year_logged} logged + {year_freezes} frozen = "
+                       f"{year_logged + year_freezes}/{total_days} days ({year_pct:.0f}%)")
+        console.print()
 
 
 def cmd_export(args):
@@ -623,6 +1009,32 @@ def build_parser() -> argparse.ArgumentParser:
     p_del.add_argument("name", help="Habit name")
     p_del.add_argument("--force", action="store_true", help="Confirm deletion")
 
+    # freeze
+    p_freeze = sub.add_parser("freeze", help="Freeze a habit for a date (planned rest day)")
+    p_freeze.add_argument("name", help="Habit name")
+    p_freeze.add_argument("--date", help="Date to freeze (YYYY-MM-DD, default: today)")
+
+    # unfreeze
+    p_unfreeze = sub.add_parser("unfreeze", help="Unfreeze a habit for a date")
+    p_unfreeze.add_argument("name", help="Habit name")
+    p_unfreeze.add_argument("--date", help="Date to unfreeze (YYYY-MM-DD, default: today)")
+
+    # template
+    p_tpl = sub.add_parser("template", help="Habit templates — list or use")
+    tpl_sub = p_tpl.add_subparsers(dest="action", help="Template action")
+    tpl_list = tpl_sub.add_parser("list", help="List available templates")
+    tpl_use = tpl_sub.add_parser("use", help="Create a habit from a template")
+    tpl_use.add_argument("template_id", help="Template ID (e.g., water, read, code)")
+    tpl_use.add_argument("--emoji", help="Override emoji")
+    tpl_use.add_argument("--target", type=int, help="Override target days")
+    tpl_use.add_argument("--color", default="white", help="Color for display")
+
+    # summary
+    p_summary = sub.add_parser("summary", help="Show weekly or monthly summary reports")
+    p_summary.add_argument("--period", choices=["weekly", "monthly"], default="weekly",
+                            help="Summary period (default: weekly)")
+    p_summary.add_argument("--habit", help="Filter to a specific habit (default: all)")
+
     # export
     p_export = sub.add_parser("export", help="Export data (JSON or CSV)")
     p_export.add_argument("--format", choices=["json", "csv"], default="json", help="Export format")
@@ -651,6 +1063,10 @@ def main():
         "stats": cmd_stats,
         "rename": cmd_rename,
         "delete": cmd_delete,
+        "freeze": cmd_freeze,
+        "unfreeze": cmd_unfreeze,
+        "template": cmd_templates,
+        "summary": cmd_summary,
         "export": cmd_export,
         "import": cmd_import,
     }

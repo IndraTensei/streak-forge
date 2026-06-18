@@ -21,6 +21,9 @@ Whether you're writing every day, exercising, learning a language, or building a
 - **🎨 Beautiful Terminal UI** — Rich tables, panels, and progress bars
 - **💾 Local Storage** — All data stored locally in `~/.streak-forge/habits.json`
 - **🔧 Fully CLI** — No dependencies on external services, works offline
+- **🥅 Streak Freeze** — Mark planned rest days without breaking your streak
+- **📋 Habit Templates** — 10 pre-built habit templates for common goals
+- **📈 Summary Reports** — Weekly and monthly completion reports with progress bars
 
 ## 🚀 Installation
 
@@ -110,6 +113,43 @@ streak-forge export --format csv > my-habits.csv
 streak-forge import my-habits.json
 ```
 
+### Streak Freeze (Rest Days)
+
+```bash
+# Freeze today (planned rest day — won't break your streak)
+streak-forge freeze "Morning Run"
+
+# Freeze a specific date
+streak-forge freeze "Morning Run" --date 2026-06-20
+
+# Unfreeze if you change your mind
+streak-forge unfreeze "Morning Run" --date 2026-06-20
+```
+
+### Habit Templates
+
+```bash
+# List available templates
+streak-forge template list
+
+# Create a habit from a template
+streak-forge template use water
+streak-forge template use code --target 365
+streak-forge template use meditate --emoji 🌸
+```
+
+Available templates: `water`, `read`, `exercise`, `meditate`, `journal`, `code`, `walk`, `sleep`, `gratitude`, `stretch`
+
+### Summary Reports
+
+```bash
+# Weekly summary for all habits
+streak-forge summary --period weekly
+
+# Monthly summary for a specific habit
+streak-forge summary --period monthly --habit "Morning Run"
+```
+
 ## 🎮 Example Session
 
 ```bash
@@ -175,13 +215,14 @@ Contributions are welcome! Here's how to get started:
 
 ### Ideas for Contributions
 
-- [ ] Weekly/monthly summary reports
+- [x] Weekly/monthly summary reports
+- [x] Habit templates (common habits with preset targets)
+- [x] Streak freeze/skip days (for planned rest days)
 - [ ] Habit categories and tags
 - [ ] Reminder notifications
-- [ ] Streak freeze/skip days (for planned rest days)
 - [ ] ASCII art streak visualizations
 - [ ] Integration with cron for daily reminders
-- [ ] Habit templates (common habits with preset targets)
+- [ ] Habit chaining (link habits together)
 
 ## 📝 License
 
