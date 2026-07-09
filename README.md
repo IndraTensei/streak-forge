@@ -10,20 +10,23 @@ Whether you're writing every day, exercising, learning a language, or building a
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-cross--platform-lightgrey)
 
-## ✨ Features
+## Features
 
-- **🎯 Habit Tracking** — Create named habits with custom emojis and day targets
-- **🔥 Streak Visualization** — Fire emoji indicators that grow with your streak
-- **📅 Contribution Calendar** — GitHub-style calendar showing your activity over the last 52 weeks
-- **🏆 Milestone Celebrations** — Special messages at 1, 3, 7, 14, 21, 30, 50, 66, 100, and 365 days
-- **📊 Global Stats** — See your best streaks, total logs, and overall progress
-- **📤 Export & Import** — Export to JSON/CSV, import from JSON files
-- **🎨 Beautiful Terminal UI** — Rich tables, panels, and progress bars
-- **💾 Local Storage** — All data stored locally in `~/.streak-forge/habits.json`
-- **🔧 Fully CLI** — No dependencies on external services, works offline
-- **🥅 Streak Freeze** — Mark planned rest days without breaking your streak
-- **📋 Habit Templates** — 10 pre-built habit templates for common goals
-- **📈 Summary Reports** — Weekly and monthly completion reports with progress bars
+- Habit Tracking - Create named habits with custom emojis and day targets
+- Streak Visualization - Fire emoji indicators that grow with your streak
+- Contribution Calendar - GitHub-style calendar showing your activity over the last 52 weeks
+- Milestone Celebrations - Special messages at 1, 3, 7, 14, 21, 30, 50, 66, 100, and 365 days
+- Global Stats - See your best streaks, total logs, and overall progress
+- Export & Import - Export to JSON/CSV, import from JSON files
+- Beautiful Terminal UI - Rich tables, panels, and progress bars
+- Local Storage - All data stored locally in `~/.streak-forge/habits.json`
+- Fully CLI - No dependencies on external services, works offline
+- Streak Freeze - Mark planned rest days without breaking your streak
+- Habit Templates - 10 pre-built habit templates for common goals
+- Summary Reports - Weekly and monthly completion reports with progress bars
+- Habit Categories - Organize habits into custom categories
+- Log Notes - Add optional notes to log entries to track details
+- Category View - List all habits organized by category
 
 ## 🚀 Installation
 
@@ -150,6 +153,29 @@ streak-forge summary --period weekly
 streak-forge summary --period monthly --habit "Morning Run"
 ```
 
+### Habit Categories
+
+```bash
+# Create a habit with a category
+streak-forge start "Morning Run" --category health
+
+# Create a habit from a template with a category
+streak-forge template use exercise --category fitness
+
+# List all habits organized by category
+streak-forge categories
+```
+
+### Log Notes
+
+```bash
+# Log with an optional note
+streak-forge log "Morning Run" --note "Ran 5km in 25 minutes"
+
+# View notes in habit details
+streak-forge show "Morning Run"
+```
+
 ## 🎮 Example Session
 
 ```bash
@@ -218,7 +244,8 @@ Contributions are welcome! Here's how to get started:
 - [x] Weekly/monthly summary reports
 - [x] Habit templates (common habits with preset targets)
 - [x] Streak freeze/skip days (for planned rest days)
-- [ ] Habit categories and tags
+- [x] Habit categories and tags
+- [x] Log notes/comments for entries
 - [ ] Reminder notifications
 - [ ] ASCII art streak visualizations
 - [ ] Integration with cron for daily reminders

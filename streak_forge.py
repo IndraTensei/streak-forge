@@ -37,13 +37,14 @@ from rich import box
 
 console = Console()
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # ── Data storage ──────────────────────────────────────────────────────────────
 
 DATA_DIR = Path.home() / ".streak-forge"
 DATA_FILE = DATA_DIR / "habits.json"
 FREEZE_FILE = DATA_DIR / "freezes.json"
+NOTES_FILE = DATA_DIR / "notes.json"
 
 # ── Habit Templates ───────────────────────────────────────────────────────────
 
@@ -139,6 +140,19 @@ def _load_freezes() -> dict:
 def _save_freezes(freezes: dict):
     with open(FREEZE_FILE, "w") as f:
         json.dump(freezes, f, indent=2)
+
+
+def _load_notes() -> dict:
+    """Load notes data: {habit_name: {date_string: note_text}}."""
+    if not NOTES_FILE.exists():
+        return {}
+    with open(NOTES_FILE, "r") as f:
+        return json.load(f)
+
+
+def _save_notes(notes: dict):
+    with open(NOTES_FILE, "w") as f:
+        json.dump(notes, f, indent=2)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -257,6 +271,7 @@ def cmd_start(args):
         "target_days": args.target,
         "emoji": args.emoji or "⭐",
         "color": args.color or "white",
+        "category": args.category or "general",
     }
     data["habits"].append(habit)
     if name not in data["logs"]:
@@ -305,6 +320,14 @@ def cmd_log(args):
     data["logs"][habit_name].append(log_date)
     _save(data)
 
+    # Save note if provided
+    if args.note:
+        notes = _load_notes()
+        if habit_name not in notes:
+            notes[habit_name] = {}
+        notes[habit_name][log_date] = args.note
+        _save_notes(notes)
+
     dates = data["logs"][habit_name]
     freezes = _load_freezes().get(habit_name, [])
     streak = _streak_for_dates(dates, freezes)
@@ -313,6 +336,9 @@ def cmd_log(args):
     console.print()
     console.print(f"  {fire} [bold green]Logged![/bold green] '{habit_name}' for {log_date}")
     console.print(f"  Current streak: [bold]{streak}[/bold] day{'s' if streak != 1 else ''}")
+
+    if args.note:
+        console.print(f"  [dim]Note: {args.note}[/dim]")
 
     milestone = _milestone_message(streak)
     if milestone:
@@ -416,11 +442,21 @@ def cmd_show(args):
         f"  Target:          [bold]{target}[/bold] days",
         f"  Progress:        {_progress_bar(total, target)}",
         f"  Created:         {habit.get('created_at', 'N/A')}",
+        f"  Category:        {habit.get('category', 'general')}",
     ]
 
     if dates:
         info_lines.append(f"  First Log:       {dates[0]}")
         info_lines.append(f"  Last Log:        {dates[-1]}")
+
+    # Show recent notes (last 5)
+    notes = _load_notes().get(habit_name, {})
+    if notes:
+        info_lines.append("")
+        info_lines.append("  [bold]Recent Notes:[/bold]")
+        sorted_notes = sorted(notes.items(), reverse=True)[:5]
+        for log_date, note in sorted_notes:
+            info_lines.append(f"  [dim]{log_date}:[/dim] {note[:60]}{'...' if len(note) > 60 else ''}")
 
     # Recent activity (last 14 days)
     info_lines.append("")
@@ -741,6 +777,7 @@ def cmd_templates(args):
             "emoji": args.emoji if args.emoji else tpl["emoji"],
             "color": args.color or "white",
             "template": template_id,
+            "category": args.category if args.category else "general",
         }
         data["habits"].append(habit)
         if name not in data["logs"]:
@@ -909,6 +946,62 @@ def cmd_summary(args):
         console.print()
 
 
+def cmd_categories(args):
+    """List all habits organized by category."""
+    data = _load()
+    habits = data["habits"]
+
+    if not habits:
+        console.print(Panel(
+            "[dim]No habits tracked yet.[/dim]\n\n"
+            "Start your first streak:\n"
+            "[bold]  streak-forge start \"My Habit\"[/bold]",
+            title="🔥 StreakForge",
+            border_style="dim",
+        ))
+        return
+
+    # Group habits by category
+    categories = {}
+    for h in habits:
+        cat = h.get("category", "general")
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(h)
+
+    console.print()
+    console.print(Panel(
+        "[bold]Habits by Category[/bold]",
+        title="🔥 StreakForge",
+        border_style="cyan",
+    ))
+
+    all_freezes = _load_freezes()
+    for cat in sorted(categories.keys()):
+        habit_list = categories[cat]
+        cat_total = 0
+        cat_table = Table(box=box.SIMPLE, show_lines=False, padding=(0, 1))
+        cat_table.add_column("Emoji", justify="center", width=4)
+        cat_table.add_column("Habit", style="bold", min_width=20)
+        cat_table.add_column("Streak", justify="right", width=8)
+        cat_table.add_column("Target", justify="right", width=7)
+
+        for h in habit_list:
+            name = h["name"]
+            dates = data["logs"].get(name, [])
+            freezes = all_freezes.get(name, [])
+            streak = _streak_for_dates(dates, freezes)
+            cat_total += streak
+            emoji = h.get("emoji", "⭐")
+            target = h.get("target_days", 30)
+            cat_table.add_row(emoji, name, str(streak), f"{target}d")
+
+        console.print(f"\n  [bold cyan]{cat.upper()}[/bold cyan] ({len(habit_list)} habits, {cat_total} active days)")
+        console.print(cat_table)
+
+    console.print(f"\n  [dim]Total categories: {len(categories)}[/dim]\n")
+
+
 def cmd_export(args):
     """Export all data to JSON or CSV."""
     data = _load()
@@ -979,11 +1072,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_start.add_argument("--target", type=int, default=30, help="Target days (default: 30)")
     p_start.add_argument("--emoji", default="⭐", help="Emoji for the habit (default: ⭐)")
     p_start.add_argument("--color", default="white", help="Color for display")
+    p_start.add_argument("--category", default="general", help="Category for the habit (default: general)")
 
     # log
     p_log = sub.add_parser("log", help="Log activity for a habit")
     p_log.add_argument("name", help="Habit name")
     p_log.add_argument("--date", help="Date to log (YYYY-MM-DD, default: today)")
+    p_log.add_argument("--note", help="Optional note to attach to this log entry")
 
     # list
     sub.add_parser("list", help="List all habits with streaks")
@@ -1028,6 +1123,7 @@ def build_parser() -> argparse.ArgumentParser:
     tpl_use.add_argument("--emoji", help="Override emoji")
     tpl_use.add_argument("--target", type=int, help="Override target days")
     tpl_use.add_argument("--color", default="white", help="Color for display")
+    tpl_use.add_argument("--category", help="Category for the habit")
 
     # summary
     p_summary = sub.add_parser("summary", help="Show weekly or monthly summary reports")
@@ -1042,6 +1138,9 @@ def build_parser() -> argparse.ArgumentParser:
     # import
     p_import = sub.add_parser("import", help="Import habits from JSON file")
     p_import.add_argument("filepath", help="Path to JSON file")
+
+    # categories
+    sub.add_parser("categories", help="List habits by category")
 
     return parser
 
@@ -1067,6 +1166,7 @@ def main():
         "unfreeze": cmd_unfreeze,
         "template": cmd_templates,
         "summary": cmd_summary,
+        "categories": cmd_categories,
         "export": cmd_export,
         "import": cmd_import,
     }
